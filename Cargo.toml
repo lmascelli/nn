@@ -1,0 +1,15 @@
+[package]
+name = "nn"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+rand = "*"
+
+[[bin]]
+name = "xor"
+path = "src/xor.rs"
+
+[[bin]]
+name = "nn_xor"
+path = "src/nn_xor.rs"
