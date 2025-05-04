@@ -153,6 +153,10 @@ impl Matrix {
         self.sub_matrix(i, 0, 1, self.cols)
     }
 
+    pub fn col(&self, i: usize) -> Self {
+        self.sub_matrix(0, i, self.rows, 1)
+    }
+    
     pub fn from_memory(memory: &Memory, rows: usize, cols: usize) -> Self {
         debug_assert!(
             memory.size.get() == rows * cols,
@@ -205,7 +209,7 @@ impl Matrix {
 
     pub fn transpose(&mut self, m: &Matrix) {
         assert!(
-            self.rows == m.rows && self.cols == m.cols,
+            self.rows == m.cols && self.cols == m.rows,
             "[ERROR]: Matrix::transpose() matrix have different dimensions"
         );
 
@@ -322,6 +326,7 @@ pub struct NN {
     a: Vec<Matrix>,
     gw: Vec<Matrix>,
     gb: Vec<Matrix>,
+    ga: Vec<Matrix>,
 }
 
 impl NN {
@@ -332,7 +337,7 @@ impl NN {
         let mut computation_memory_size = layers[0];
         for i in 1..layers.len() {
             nn_memory_size += layers[i - 1] * layers[i] + layers[i];
-            computation_memory_size += layers[i - 1] * layers[i] + 2 * layers[i];
+            computation_memory_size += layers[i - 1] * layers[i] + 3 * layers[i];
         }
 
         let nn_memory = Memory::new(nn_memory_size);
@@ -343,14 +348,16 @@ impl NN {
         let mut a = Vec::new();
         let mut gw = Vec::new();
         let mut gb = Vec::new();
-
-        a.push(Matrix::alloc(&computation_memory, 1, layers[0]));
+        let mut ga = Vec::new();
+        
+        a.push(Matrix::alloc(&computation_memory, layers[0], 1));
         for i in 1..layers.len() {
-            w.push(Matrix::alloc(&nn_memory, layers[i - 1], layers[i]));
-            b.push(Matrix::alloc(&nn_memory, 1, layers[i]));
-            a.push(Matrix::alloc(&computation_memory, 1, layers[i]));
-            gw.push(Matrix::alloc(&computation_memory, layers[i-1], layers[i]));
-            gb.push(Matrix::alloc(&computation_memory, 1, layers[i]));
+            w.push(Matrix::alloc(&nn_memory, layers[i], layers[i-1]));
+            b.push(Matrix::alloc(&nn_memory, layers[i], 1));
+            a.push(Matrix::alloc(&computation_memory, layers[i], 1));
+            gw.push(Matrix::alloc(&computation_memory, layers[i], layers[i-1]));
+            gb.push(Matrix::alloc(&computation_memory, layers[i], 1));
+            ga.push(Matrix::alloc(&computation_memory, layers[i], 1));
         }
 
         for i in 0..n_layers {
@@ -367,16 +374,17 @@ impl NN {
             a,
             gw,
             gb,
+            ga,
         }
     }
 
     pub fn set_input(&mut self, input: &[f32]) {
         debug_assert!(
-            self.a[0].cols == input.len(),
+            self.a[0].rows == input.len(),
             "[ERROR]: NN::set_input() input len different from NN input"
         );
         for i in 0..input.len() {
-            *self.a[0].get_mut(0, i) = input[i];
+            *self.a[0].get_mut(i, 0) = input[i];
         }
     }
 
@@ -387,33 +395,33 @@ impl NN {
     pub fn forward(&mut self) {
         for i in 0..self.n_layers {
             let (a_prev, a_next) = self.a.split_at_mut(i + 1);
-            a_next[0].dot(&a_prev[i], &self.w[i]);
+            a_next[0].dot(&self.w[i], &a_prev[i]);
             a_next[0].add(&self.b[i]);
             a_next[0].sigmoid();
         }
     }
 
     pub fn cost(&mut self, ti: &Matrix, to: &Matrix) -> f32 {
-        assert!(ti.rows == to.rows);
-        assert!(to.cols == self.a[self.n_layers].cols);
+        assert!(ti.cols == to.cols);
+        assert!(to.rows == self.a[self.n_layers].rows);
 
         let mut cost = 0f32;
 
-        for i in 0..ti.rows {
-            self.a[0].copy(&ti.row(i));
+        for i in 0..ti.cols {
+            self.a[0].copy(&ti.col(i));
             self.forward();
 
-            for j in 0..to.cols {
-                let d = self.a[self.n_layers].get(0, j) - to.get(i, j);
+            for j in 0..to.rows {
+                let d = self.a[self.n_layers].get(j, 0) - to.get(j, i);
                 cost += d * d;
             }
         }
 
-        cost / ti.rows as f32
+        cost / ti.cols as f32
     }
 
     pub fn finite_diff(&mut self, eps: f32, ti: &Matrix, to: &Matrix) {
-        let mut saved = 0f32;
+        let mut saved;
         let cost = self.cost(ti, to);
 
         for i in 0..self.n_layers {
@@ -458,7 +466,7 @@ impl std::fmt::Display for NN {
         for i in 0..self.n_layers {
             writeln!(f, "  w[{i}] = {{")?;
             for r in 0..self.w[i].rows {
-                write!(f, "    ");
+                write!(f, "    ")?;
                 for c in 0..self.w[i].cols {
                     write!(f, "{} ", self.w[i].get(r, c))?;
                 }
@@ -468,7 +476,7 @@ impl std::fmt::Display for NN {
 
             writeln!(f, "  b[{i}] = {{")?;
             for r in 0..self.b[i].rows {
-                write!(f, "    ");
+                write!(f, "    ")?;
                 for c in 0..self.b[i].cols {
                     write!(f, "{} ", self.b[i].get(r, c))?;
                 }
@@ -572,26 +580,39 @@ mod test {
     }
 
     #[test]
-    fn matrix_row_copy() {
+    fn matrix_row_col_copy() {
         let memory = Memory::new(32);
         let mut matrix1 = Matrix::alloc(&memory, 3, 3);
         let mut matrix2 = Matrix::alloc(&memory, 1, 3);
+        let mut matrix3 = Matrix::alloc(&memory, 3, 1);        
 
         matrix1.eye();
         matrix2.copy(&matrix1.row(0));
         assert_eq!(*matrix2.get(0, 0), 1f32);
         assert_eq!(*matrix2.get(0, 1), 0f32);
         assert_eq!(*matrix2.get(0, 2), 0f32);
+        matrix3.copy(&matrix1.col(0));
+        assert_eq!(*matrix3.get(0, 0), 1f32);
+        assert_eq!(*matrix3.get(1, 0), 0f32);
+        assert_eq!(*matrix3.get(2, 0), 0f32);
 
         matrix2.copy(&matrix1.row(1));
         assert_eq!(*matrix2.get(0, 0), 0f32);
         assert_eq!(*matrix2.get(0, 1), 1f32);
         assert_eq!(*matrix2.get(0, 2), 0f32);
+        matrix3.copy(&matrix1.col(1));
+        assert_eq!(*matrix3.get(0, 0), 0f32);
+        assert_eq!(*matrix3.get(1, 0), 1f32);
+        assert_eq!(*matrix3.get(2, 0), 0f32);
 
         matrix2.copy(&matrix1.row(2));
         assert_eq!(*matrix2.get(0, 0), 0f32);
         assert_eq!(*matrix2.get(0, 1), 0f32);
         assert_eq!(*matrix2.get(0, 2), 1f32);
+        matrix3.copy(&matrix1.col(2));
+        assert_eq!(*matrix3.get(0, 0), 0f32);
+        assert_eq!(*matrix3.get(1, 0), 0f32);
+        assert_eq!(*matrix3.get(2, 0), 1f32);
     }
 
     #[test]
