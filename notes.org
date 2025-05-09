@@ -1,53 +1,22 @@
-% Created 2025-05-09 Fri 16:01
-% Intended LaTeX compiler: pdflatex
-\documentclass[11pt]{article}
-\usepackage[utf8]{inputenc}
-\usepackage[T1]{fontenc}
-\usepackage{graphicx}
-\usepackage{longtable}
-\usepackage{wrapfig}
-\usepackage{rotating}
-\usepackage[normalem]{ulem}
-\usepackage{amsmath}
-\usepackage{amssymb}
-\usepackage{capt-of}
-\usepackage{hyperref}
-\usepackage{tikz}
-\usetikzlibrary{positioning}
-\author{Leonardo Mascelli}
-\date{\today}
-\title{Notes on neural networks}
-\hypersetup{
- pdfauthor={Leonardo Mascelli},
- pdftitle={Notes on neural networks},
- pdfkeywords={},
- pdfsubject={},
- pdfcreator={Emacs 31.0.50 (Org mode 9.7.11)}, 
- pdflang={English}}
-\begin{document}
-
-\maketitle
-\tableofcontents
-
-\section{Network equation}
-\label{sec:org7480b94}
-\subsection{Simple single neuron network}
-\label{sec:org470b58d}
-
+#+title: Notes on neural networks
+#+author: Leonardo Mascelli
+#+latex_header: \usepackage{tikz}
+#+latex_header: \usetikzlibrary{positioning}
+* Network equation
+** Simple single neuron network
+ 
 I'll start with a simple network where each layer has only one neuron, one input and one output.
 
 \hfill
 
 Denote:
-\begin{itemize}
-\item \(a_0\) is the input of the network,
-\item \(i\) is the \(i_{th}\) layer of the network, varing from 1 to N,
-\item \(W_i\) with the \(i_{th}\) matrix (in this case scalar) of weights of the \(i_{th}\) layer,
-\item \(b_i\) with the \(i_{th}\) vector (in this case scalar) of bias of the \(i_{th}\) layer,
-\item \(a_i\) with the \(i_{th}\) vector (in this case scalar) of outputs of the \(i_{th}\) layer,
-\item \(\sigma(x) = \frac{1}{1+e^{-x}}\) so that
-\end{itemize}
-
+- $a_0$ is the input of the network,
+- $i$ is the $i_{th}$ layer of the network, varing from 1 to N,
+- $W_i$ with the $i_{th}$ matrix (in this case scalar) of weights of the $i_{th}$ layer,
+- $b_i$ with the $i_{th}$ vector (in this case scalar) of bias of the $i_{th}$ layer,
+- $a_i$ with the $i_{th}$ vector (in this case scalar) of outputs of the $i_{th}$ layer,
+- $\sigma(x) = \frac{1}{1+e^{-x}}$ so that
+  
 \begin{equation}
   a_i = \sigma(W_ia_{i-1}+b_i)
 \end{equation}
@@ -92,36 +61,34 @@ and denote the cost function
   C(W) = \sum_{c=1}^C(a_{N, c} - y_c)^2
 \end{equation}
 
-The goal is to find the parameters of the network \(W_1, W_2, .. W_n\) that minimize the cost function.
+The goal is to find the parameters of the network $W_1, W_2, .. W_n$ that minimize the cost function.
 
 \begin{align}
   \frac{\partial C}{\partial W_1} = \sum_{c=1}^N 2
 \end{align}
-\section{Complete network}
-\label{sec:org49decd3}
-\subsection{Activation function of one layer}
-\label{sec:org733aac5}
+
+
+* Complete network
+** Activation function of one layer
 \begin{equation}
 a_{n}^{k} = \sigma(\sum_{l=1}^{N(k-1)} w_{n, l}^{k} a_{l}^{k-1} + b_{n})
 \end{equation}
-\subsection{Cost function}
-\label{sec:org39af615}
+
+** Cost function
 Let:
-\begin{itemize}
-\item \(T\): the number of trials,
-\item \(K\): the number of layers of the network,
-\item \(N(k)\): the number of nodes in the \(k\) layer of the network,
-\end{itemize}
+- $T$: the number of trials,
+- $K$: the number of layers of the network,
+- $N(k)$: the number of nodes in the $k$ layer of the network,
 
 \begin{equation}
 C = \sum_{i=1}^{T}\sum_{n=1}^{N(K)} (a_{n}^{N(K)} - y_{n})^{2}
 \end{equation}
-\subsubsection{Layer K: Last layer}
-\label{sec:org6f4ace2}
-let's try finding the derivatives with the weights of the last layer, \(K\) and lets denote the error of the \(n_{\text{th}}\) output with:
 
-\(\newline\)
-\(\epsilon_{n} = (a_{n}^{K} - y_{n})\)
+*** Layer K: Last layer
+let's try finding the derivatives with the weights of the last layer, $K$ and lets denote the error of the $n_{\text{th}}$ output with:
+
+$\newline$
+$\epsilon_{n} = (a_{n}^{K} - y_{n})$
 
 \begin{align}
 \frac{\partial C}{\partial w_{c,p}^{K}} &= \sum_{i=1}^{T}\sum_{n=1}^{N(K)} 2\epsilon_{n}\frac{\partial a_{n}^{K}}{\partial w_{c,p}^{K}}
@@ -138,20 +105,20 @@ z_{n}^{K} &= \sum_{l=1}^{N(K-1)} w_{n, l}^{K} a_{l}^{K-1} + b_{n}
 \end{align}
 
 We've found the the derivatives for the weights of the last layer are:
-\(\newline\)
+$\newline$
 \begin{equation}
 \frac{\partial C}{\partial w_{c,p}^{K}} = \sum_{i=1}^{T}2\epsilon_{c}a_{c}^{K}(1-a_{c}^{K})a_{p}^{K-1}
 \end{equation}
-\(\newline\)
-Let's define \(2\epsilon_{c}a_{c}^{K}(1-a_{c}^{K})\), the back propagation of the error in \(c\) node of the last layer as \(e_{c}^{K}\).
+$\newline$
+Let's define $2\epsilon_{c}a_{c}^{K}(1-a_{c}^{K})$, the back propagation of the error in $c$ node of the last layer as $e_{c}^{K}$.
 Then:
-\(\newline\)
+$\newline$
 \begin{equation}
 \frac{\partial C}{\partial w_{c,p}^{K}} = \sum_{i=1}^{T}e_{c} a_{p}
 \end{equation}
-\subsubsection{Layer K - 1}
-\label{sec:orga6a1b07}
-let's try now with the derivatives of the layer before the last, \(K-1\): 
+
+*** Layer K - 1
+let's try now with the derivatives of the layer before the last, $K-1$: 
 \begin{align}
 \frac{\partial C}{\partial w_{c,p}^{K-1}} &= \sum_{i=1}^{T}\sum_{n=1}^{N(K)} 2\epsilon_{n}\frac{\partial a_{n}^{K}}{\partial w_{c,p}^{K-1}}
 \\
@@ -180,7 +147,7 @@ We've found the the derivatives for the weights of layer before the last layer a
 \frac{\partial C}{\partial w_{c,p}^{K-1}} = \sum_{i=1}^{T}\sum_{n=1}^{N(K)} 2\epsilon_{n}a_{n}^{K}(1-a_{n}^{K})w_{n, c}^{K}a_{c}^{K-1}(1-a_{c}^{K-1})a_{p}^{K-2}
 \end{equation}
 
-You can recognize in the equation the term \(2e_{n}a_{n}^{K}(1-a_{n}^{K})\) to be what we first had defined as the propagation of the error in the \(K\) layer, \(e_{n}^{K}\).
+You can recognize in the equation the term $2e_{n}a_{n}^{K}(1-a_{n}^{K})$ to be what we first had defined as the propagation of the error in the $K$ layer, $e_{n}^{K}$.
 
 \begin{equation}
 \frac{\partial C}{\partial w_{c,p}^{K-1}} = \sum_{i=1}^{T}\sum_{n=1}^{N(K)}e_{n}^{K}w_{n, c}a_{c}^{K-1}(1-a_{c}^{K-1})a_{p}^{K-2}
@@ -195,9 +162,9 @@ so that:
 \begin{equation}
 \frac{\partial C}{\partial w_{c,p}^{K-1}} = \sum_{i=1}^{T}e_c^{K-1}a_{p}^{K-2}
 \end{equation}
-\subsubsection{Layer K-2}
-\label{sec:orgeb1922f}
-let's try now with the derivatives of two layers before the last, \(K-2\):
+
+*** Layer K-2
+let's try now with the derivatives of two layers before the last, $K-2$:
 \begin{align}
 \frac{\partial C}{\partial w_{c,p}^{K-2}} &= \sum_{i=1}^{T}\sum_{n=1}^{N(K)} 2\epsilon_{n}\frac{\partial a_{n}^{K}}{\partial w_{c,p}^{K-2}}
 \\
@@ -218,13 +185,13 @@ let's try now with the derivatives of two layers before the last, \(K-2\):
 \frac{\partial C}{\partial w_{c,p}^{K-2}} &= \sum_{i=1}^{T}\sum_{n=1}^{N(K)} 2\epsilon_{n}a_{n}^{K}(1-a_{n}^{K})\sum_{l=1}^{N(K-1)} w_{n, l}^{K}a_{l}^{K-1}(1-a_{l}^{K-1})w_{l,c}^{K-1}a_{c}^{K-2}(1-a_{c}^{K-2})a_{p}^{K-3}
 \end{align}
 
-So the derivative of the layer \(K-2\) is:
+So the derivative of the layer $K-2$ is:
 
 \begin{equation}
 \frac{\partial C}{\partial w_{c,p}^{K-2}} = \sum_{i=1}^{T}\sum_{n=1}^{N(K)} 2\epsilon_{n}a_{n}^{K}(1-a_{n}^{K})\sum_{l=1}^{N(K-1)} w_{n, l}^{K}a_{l}^{K-1}(1-a_{l}^{K-1})w_{l,c}^{K-1}a_{c}^{K-2}(1-a_{c}^{K-2})a_{p}^{K-3}
 \end{equation}
 
-switching the summatories with \(n\) and \(l\):
+switching the summatories with $n$ and $l$:
 \begin{equation}
 \frac{\partial C}{\partial w_{c,p}^{K-2}} = \sum_{i=1}^{T}\sum_{l=1}^{N(K-1)}\sum_{n=1}^{N(K)} 2\epsilon_{n}a_{n}^{K}(1-a_{n}^{K})w_{n, l}^{K}a_{l}^{K-1}(1-a_{l}^{K-1})w_{l,c}^{K-1}a_{c}^{K-2}(1-a_{c}^{K-2})a_{p}^{K-3}
 \end{equation}
@@ -235,7 +202,7 @@ you can see that the term
 \sum_{n=1}^{N(K)} 2\epsilon_{n}a_{n}^{K}(1-a_{n}^{K})w_{n, l}^{K}a_{l}^{K-1}(1-a_{l}^{K-1})
 \end{equation}
 
-is the propagation of the error to the \(l\) element of the \(K-1\) layer, \(e_{l}^{K-1}\). Then you can write:
+is the propagation of the error to the $l$ element of the $K-1$ layer, $e_{l}^{K-1}$. Then you can write:
 
 \begin{equation}
 \frac{\partial C}{\partial w_{c,p}^{K-2}} = \sum_{i=1}^{T}\sum_{l=1}^{N(K-1)}e_{l}^{K-1}w_{l,c}^{K-1}a_{c}^{K-2}(1-a_{c}^{K-2})a_{p}^{K-3}
@@ -247,9 +214,8 @@ and denote
 e_{c}^{K-2} = \sum_{l=1}^{N(K-1)}e_{l}^{K-1}w_{l,c}^{K-1}a_{c}^{K-2}(1-a_{c}^{K-2})
 \end{equation}
 
-as the propagation of the error to the \(c\) node of the \(K-2\) layer so that:
+as the propagation of the error to the $c$ node of the $K-2$ layer so that:
 
 \begin{equation}
 \frac{\partial C}{\partial w_{c,p}^{K-2}} = e_{c}^{K-2}a_{p}^{K-3}
 \end{equation}
-\end{document}

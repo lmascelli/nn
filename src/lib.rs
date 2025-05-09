@@ -444,6 +444,19 @@ impl NN {
         }
     }
 
+    pub fn back_prop_one_trial(&mut self, ti: &Matrix, to: &Matrix) {
+        debug_assert!(ti.cols == 1 && to.cols == 1);
+        debug_assert!(ti.rows == self.a[0].rows);
+        debug_assert!(to.rows == self.a[self.n_layers].rows);
+        
+        // compute initial error
+        for 
+        
+        for layer_index in (0..(self.n_layers-1)).rev() {
+            
+        }
+    }
+
     pub fn learn(&mut self, rate: f32) {
         for i in 0..self.n_layers {
             for j in 0..self.w[i].rows {
