@@ -1,7 +1,7 @@
 use nn::{Matrix, Memory};
 
 struct Xor {
-    memory: Memory,
+    _memory: Memory,
     a0: Matrix,
     w1: Matrix,
     b1: Matrix,
@@ -14,13 +14,13 @@ struct Xor {
 impl Xor {
     fn new() -> Self {
         let memory = Memory::new(256);
-        let mut a0 = Matrix::alloc(&memory, 1, 2);
+        let a0 = Matrix::alloc(&memory, 1, 2);
         let mut w1 = Matrix::alloc(&memory, 2, 2);
         let mut b1 = Matrix::alloc(&memory, 1, 2);
-        let mut a1 = Matrix::alloc(&memory, 1, 2);
+        let a1 = Matrix::alloc(&memory, 1, 2);
         let mut w2 = Matrix::alloc(&memory, 2, 1);
         let mut b2 = Matrix::alloc(&memory, 1, 1);
-        let mut a2 = Matrix::alloc(&memory, 1, 1);
+        let a2 = Matrix::alloc(&memory, 1, 1);
 
         w1.random();
         b1.random();
@@ -28,7 +28,7 @@ impl Xor {
         b2.random();
 
         Self {
-            memory,
+            _memory: memory,
             a0,
             w1,
             b1,
@@ -69,7 +69,7 @@ impl Xor {
 }
 
 fn finite_diff(m: &mut Xor, grad: &mut Xor, eps: f32, ti: &Matrix, to: &Matrix) {
-    let mut saved = 0f32;
+    let mut saved;
     let cost = m.cost(ti, to);
 
     for i in 0..m.w1.rows {
@@ -148,7 +148,7 @@ fn main() {
     println! {"ti = {ti}"};
     println! {"ti = {to}"};
     println!("cost = {}", xor.cost(&ti, &to));
-    for i in 0..10000 {
+    for _ in 0..10000 {
         finite_diff(&mut xor, &mut grad, 1e-1, &ti, &to);
         learn(&mut xor, &mut grad, 1e-1);
     }

@@ -17,12 +17,12 @@ pub fn main() {
     println! {"training input = {ti}"};
     println! {"training output = {to}"};
 
-    let eps = 1e-1;
     let rate = 1e-1;
-    let cycles = 1e5 as usize;
+    let cycles = 1e4 as usize;
+    println!("\nNetwork weights before training: {xor}");
 
     for _ in 0..cycles {
-        xor.finite_diff(eps, &ti, &to);
+        xor.back_prop(&ti, &to);
         xor.learn(rate);
     }
 

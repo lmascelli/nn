@@ -156,7 +156,7 @@ impl Matrix {
     pub fn col(&self, i: usize) -> Self {
         self.sub_matrix(0, i, self.rows, 1)
     }
-    
+
     pub fn from_memory(memory: &Memory, rows: usize, cols: usize) -> Self {
         debug_assert!(
             memory.size.get() == rows * cols,
@@ -334,7 +334,7 @@ impl NN {
         let n_layers = layers.len() - 1;
         debug_assert!(n_layers > 0);
         let mut nn_memory_size = 0;
-        let mut computation_memory_size = layers[0];
+        let mut computation_memory_size = layers[0] * 2;
         for i in 1..layers.len() {
             nn_memory_size += layers[i - 1] * layers[i] + layers[i];
             computation_memory_size += layers[i - 1] * layers[i] + 3 * layers[i];
@@ -349,13 +349,14 @@ impl NN {
         let mut gw = Vec::new();
         let mut gb = Vec::new();
         let mut ga = Vec::new();
-        
+
         a.push(Matrix::alloc(&computation_memory, layers[0], 1));
+        ga.push(Matrix::alloc(&computation_memory, layers[0], 1));
         for i in 1..layers.len() {
-            w.push(Matrix::alloc(&nn_memory, layers[i], layers[i-1]));
+            w.push(Matrix::alloc(&nn_memory, layers[i], layers[i - 1]));
             b.push(Matrix::alloc(&nn_memory, layers[i], 1));
             a.push(Matrix::alloc(&computation_memory, layers[i], 1));
-            gw.push(Matrix::alloc(&computation_memory, layers[i], layers[i-1]));
+            gw.push(Matrix::alloc(&computation_memory, layers[i], layers[i - 1]));
             gb.push(Matrix::alloc(&computation_memory, layers[i], 1));
             ga.push(Matrix::alloc(&computation_memory, layers[i], 1));
         }
@@ -436,7 +437,7 @@ impl NN {
             for j in 0..self.b[i].rows {
                 for k in 0..self.b[i].cols {
                     saved = *self.b[i].get(j, k);
-                    *self.b[i].get_mut(j, k) += eps;                    
+                    *self.b[i].get_mut(j, k) += eps;
                     *self.gb[i].get_mut(j, k) = (self.cost(ti, to) - cost) / eps;
                     *self.b[i].get_mut(j, k) = saved;
                 }
@@ -444,16 +445,65 @@ impl NN {
         }
     }
 
-    pub fn back_prop_one_trial(&mut self, ti: &Matrix, to: &Matrix) {
-        debug_assert!(ti.cols == 1 && to.cols == 1);
-        debug_assert!(ti.rows == self.a[0].rows);
-        debug_assert!(to.rows == self.a[self.n_layers].rows);
-        
-        // compute initial error
-        for 
-        
-        for layer_index in (0..(self.n_layers-1)).rev() {
-            
+    pub fn back_prop(&mut self, ti: &Matrix, to: &Matrix) {
+        debug_assert!(ti.rows == self.a[0].rows); // input is compatible with the network
+        debug_assert!(to.rows == self.a[self.n_layers].rows); // output is compatible with the network
+        debug_assert!(ti.cols == to.cols); // the number of trials in consistent
+
+        // clear the backprop data
+        for i in 0..self.n_layers {
+            self.gw[i].zeros();
+            self.gb[i].zeros();
+            self.ga[i].zeros();
+        }
+
+        for i in 0..ti.cols {
+            // forward the network
+            self.set_input(&ti.sub_matrix(0, i, ti.rows, 1).as_vec());
+            self.forward();
+            for i in 0..self.n_layers {
+                self.ga[i].zeros();
+            }
+
+            // propagate the error in the output layer
+            for n in 0..self.a[self.n_layers].rows {
+                let an = self.a[self.n_layers].get(n, 0);
+                let err = 2f32 * (an - *to.get(n, i)) * an * (1f32 - an);
+                *self.ga[self.n_layers].get_mut(n, 0) = err;
+            }
+
+            let mut layer_index = self.n_layers - 1;
+            loop {
+                for nact_index in 0..self.a[layer_index + 1].rows {
+                    let gap = *self.ga[layer_index + 1].get(nact_index, 0);
+
+                    // update the biases
+                    *self.gb[layer_index].get_mut(nact_index, 0) += gap;
+
+                    for cact_index in 0..self.a[layer_index].rows {
+                        // update the gradients
+                        *self.gw[layer_index].get_mut(nact_index, cact_index) += gap * *self.a[layer_index].get(cact_index, 0);
+
+                        // propagate the error unless we hit the last
+                        // layer because propagating the error to the
+                        // input values is useless
+                        if layer_index != 0 {
+                            *self.ga[layer_index].get_mut(cact_index, 0) += gap
+                                * *self.w[layer_index].get(nact_index, cact_index)
+                                * *self.a[layer_index].get(cact_index, 0)
+                                * (1f32 - *self.a[layer_index].get(cact_index, 0));
+                        }
+                    }
+                }
+                if layer_index == 0 {
+                    break;
+                }
+                layer_index -= 1;
+
+                // println!("train {i} -> {input:?}:{output:?}", input=ti.sub_matrix(0, i, ti.rows, 1).as_vec(), output=to.sub_matrix(0, i, to.rows, 1).as_vec());
+                // println!("output: {:?}", self.get_output());
+                // println!("------------------------------");
+            }
         }
     }
 
@@ -597,7 +647,7 @@ mod test {
         let memory = Memory::new(32);
         let mut matrix1 = Matrix::alloc(&memory, 3, 3);
         let mut matrix2 = Matrix::alloc(&memory, 1, 3);
-        let mut matrix3 = Matrix::alloc(&memory, 3, 1);        
+        let mut matrix3 = Matrix::alloc(&memory, 3, 1);
 
         matrix1.eye();
         matrix2.copy(&matrix1.row(0));
@@ -668,6 +718,25 @@ mod test {
         let memory = Memory::from(memory_vec);
         let matrix = Matrix::from_memory(&memory, 3, 3);
 
-        assert_eq!(matrix.as_vec(), &[1f32, 2f32, 3f32, 4f32, 5f32, 6f32, 7f32, 8f32, 9f32]);
+        assert_eq!(
+            matrix.as_vec(),
+            &[1f32, 2f32, 3f32, 4f32, 5f32, 6f32, 7f32, 8f32, 9f32]
+        );
+    }
+
+    #[test]
+    fn set_input_get_output() {
+        let mut nn = NN::new(&[3, 3, 3]);
+        nn.set_input(&[1.1, 1.2, 1.3]);
+        assert_eq!(*nn.a[0].get(0, 0), 1.1);
+        assert_eq!(*nn.a[0].get(1, 0), 1.2);
+        assert_eq!(*nn.a[0].get(2, 0), 1.3);
+        *nn.a[nn.n_layers].get_mut(0, 0) = 1.0;
+        *nn.a[nn.n_layers].get_mut(1, 0) = 2.0;
+        *nn.a[nn.n_layers].get_mut(2, 0) = 3.0;
+        let output = nn.get_output();
+        assert_eq!(output[0], 1.);
+        assert_eq!(output[1], 2.);
+        assert_eq!(output[2], 3.);
     }
 }
