@@ -482,7 +482,8 @@ impl NN {
 
                     for cact_index in 0..self.a[layer_index].rows {
                         // update the gradients
-                        *self.gw[layer_index].get_mut(nact_index, cact_index) += gap * *self.a[layer_index].get(cact_index, 0);
+                        *self.gw[layer_index].get_mut(nact_index, cact_index) +=
+                            gap * *self.a[layer_index].get(cact_index, 0);
 
                         // propagate the error unless we hit the last
                         // layer because propagating the error to the
