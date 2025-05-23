@@ -1,6 +1,33 @@
 #![allow(dead_code)]
 
 use std::cell::Cell;
+use std::fs::File;
+use std::io::{Read, Result, Write};
+use std::path::Path;
+
+fn as_u8_slice<T>(value: &T) -> &[u8] {
+    let ptr = value as *const T as *const u8;
+    let size = std::mem::size_of::<T>();
+    unsafe { std::slice::from_raw_parts(ptr, size) }
+}
+
+fn as_mut_u8_slice<T>(value: &mut T) -> &mut [u8] {
+    let ptr = value as *mut T as *mut u8;
+    let size = std::mem::size_of::<T>();
+    unsafe { std::slice::from_raw_parts_mut(ptr, size) }
+}
+
+fn vec_as_u8_slice<T>(v: &Vec<T>) -> &[u8] {
+    let ptr = v.as_ptr() as *const u8;
+    let len = v.len() * std::mem::size_of::<T>();
+    unsafe { std::slice::from_raw_parts(ptr, len) }
+}
+
+fn vec_as_mut_u8_slice<T>(v: &mut Vec<T>) -> &mut [u8] {
+    let ptr = v.as_ptr() as *const u8 as *mut u8;
+    let len = v.len() * std::mem::size_of::<T>();
+    unsafe { std::slice::from_raw_parts_mut(ptr, len) }
+}
 
 mod math {
     pub fn kronecker(i: usize, j: usize) -> f32 {
@@ -25,10 +52,15 @@ impl RandomGenerator {
         use rand::RngCore;
         self.rng.next_u32() as f32 / u32::MAX as f32
     }
+
+    fn next_index(&mut self, top_limit: usize) -> usize {
+        use rand::RngCore;
+        (self.rng.next_u64() as f64 / u64::MAX as f64 * top_limit as f64) as usize
+    }
 }
 
 pub struct Memory {
-    data: Vec<f32>,
+    pub(crate) data: Vec<f32>,
     pub(crate) size: Cell<usize>,
     capacity: usize,
 }
@@ -66,6 +98,7 @@ impl Memory {
     }
 }
 
+#[repr(C)]
 pub struct Matrix {
     pub rows: usize,
     pub cols: usize,
@@ -112,6 +145,35 @@ impl Matrix {
                 .request(rows * cols)
                 .expect("Out of bounds of memory"),
         }
+    }
+
+    pub fn save<P>(&self, filepath: P) -> Result<()>
+    where
+        P: AsRef<Path>,
+    {
+        let mut file = File::create(filepath)?;
+        file.write_all(as_u8_slice(&self.rows))?;
+        file.write_all(as_u8_slice(&self.cols))?;
+        let v = self.as_vec();
+        file.write_all(vec_as_u8_slice(&v))?;
+        Ok(())
+    }
+
+    pub fn load<P>(filepath: P) -> Result<(Memory, Self)>
+    where
+        P: AsRef<Path>,
+    {
+        let mut file = File::open(filepath)?;
+        let mut rows = 0;
+        let mut cols = 0;
+        file.read_exact(as_mut_u8_slice(&mut rows))?;
+        file.read_exact(as_mut_u8_slice(&mut cols))?;
+
+        let mut memory = Memory::new(rows * cols);
+        file.read_exact(vec_as_mut_u8_slice(&mut memory.data))?;
+        let matrix = Matrix::alloc(&memory, rows, cols);
+
+        Ok((memory, matrix))
     }
 
     pub fn copy(&mut self, other: &Matrix) {
@@ -164,6 +226,15 @@ impl Matrix {
         );
         Self {
             es: memory.as_ptr(),
+            rows,
+            cols,
+            stride: cols,
+        }
+    }
+
+    pub fn from_ptr(ptr: *mut f32, rows: usize, cols: usize) -> Self {
+        Self {
+            es: ptr,
             rows,
             cols,
             stride: cols,
@@ -297,6 +368,18 @@ impl Matrix {
                 for k in 0..m1.cols {
                     *self.get_mut(i, j) += m1.get(i, k) * m2.get(k, j);
                 }
+            }
+        }
+    }
+
+    pub fn shuffle(&mut self) {
+        let mut rng = RandomGenerator::new();
+        for i in (1..self.cols - 1).rev() {
+            let swap_index = rng.next_index(i);
+            for j in 0..self.rows {
+                let temp = *self.get(j, i);
+                *self.get_mut(j, i) = *self.get(j, swap_index);
+                *self.get_mut(j, swap_index) = temp;
             }
         }
     }
@@ -468,8 +551,9 @@ impl NN {
             // propagate the error in the output layer
             for n in 0..self.a[self.n_layers].rows {
                 let an = self.a[self.n_layers].get(n, 0);
-                let err = 2f32 * (an - *to.get(n, i)) * an * (1f32 - an);
+                let err = 2f32 * (an - *to.get(n, i)) * an; // * (1f32 - an);
                 *self.ga[self.n_layers].get_mut(n, 0) = err;
+                // println!("{an} {err}");
             }
 
             let mut layer_index = self.n_layers - 1;
@@ -492,7 +576,7 @@ impl NN {
                             *self.ga[layer_index].get_mut(cact_index, 0) += gap
                                 * *self.w[layer_index].get(nact_index, cact_index)
                                 * *self.a[layer_index].get(cact_index, 0)
-                                * (1f32 - *self.a[layer_index].get(cact_index, 0));
+                                ; // * (1f32 - *self.a[layer_index].get(cact_index, 0));
                         }
                     }
                 }
@@ -500,10 +584,6 @@ impl NN {
                     break;
                 }
                 layer_index -= 1;
-
-                // println!("train {i} -> {input:?}:{output:?}", input=ti.sub_matrix(0, i, ti.rows, 1).as_vec(), output=to.sub_matrix(0, i, to.rows, 1).as_vec());
-                // println!("output: {:?}", self.get_output());
-                // println!("------------------------------");
             }
         }
     }
@@ -512,7 +592,10 @@ impl NN {
         for i in 0..self.n_layers {
             for j in 0..self.w[i].rows {
                 for k in 0..self.w[i].cols {
+                    // println!("{i},[{j},{k}] {}", *self.w[i].get(j, k));
+                    // println!("{}", *self.gw[i].get(j, k));
                     *self.w[i].get_mut(j, k) -= rate * *self.gw[i].get(j, k);
+                    // println!("{i},[{j},{k}] {}", *self.w[i].get(j, k));
                 }
             }
             for j in 0..self.b[i].rows {
@@ -521,6 +604,80 @@ impl NN {
                 }
             }
         }
+    }
+
+    pub fn save<P>(&self, filepath: P) -> Result<()>
+    where
+        P: AsRef<Path>,
+    {
+        let mut file = File::create(filepath)?;
+        file.write_all(as_u8_slice(&self.n_layers))?;
+        for i in 0..=self.n_layers {
+            file.write_all(as_u8_slice(&self.a[i].rows))?;
+        }
+        for i in 0..self.n_layers {
+            file.write_all(vec_as_u8_slice(&self.w[i].as_vec()))?;
+        }
+        for i in 0..self.n_layers {
+            file.write_all(vec_as_u8_slice(&self.b[i].as_vec()))?;
+        }
+        Ok(())
+    }
+    
+    pub fn load<P>(filepath: P) -> Result<NN>
+    where
+        P: AsRef<Path>,
+    {
+        let mut file = File::open(filepath)?;
+        let mut n_layers: usize = 0;
+        file.read_exact(as_mut_u8_slice(&mut n_layers))?;
+        let mut layers = vec![0usize; n_layers+1];
+        file.read_exact(vec_as_mut_u8_slice(&mut layers))?;
+
+        let mut nn_memory_size = 0;
+        let mut computation_memory_size = layers[0] * 2;
+        for i in 1..layers.len() {
+            nn_memory_size += layers[i - 1] * layers[i] + layers[i];
+            computation_memory_size += layers[i - 1] * layers[i] + 3 * layers[i];
+        }
+
+        let mut nn_memory = Memory::new(nn_memory_size);
+        file.read_exact(vec_as_mut_u8_slice(&mut nn_memory.data))?;
+        let computation_memory = Memory::new(computation_memory_size);
+
+        let mut w = Vec::new();
+        let mut b = Vec::new();
+        let mut a = Vec::new();
+        let mut gw = Vec::new();
+        let mut gb = Vec::new();
+        let mut ga = Vec::new();
+
+        a.push(Matrix::alloc(&computation_memory, layers[0], 1));
+        ga.push(Matrix::alloc(&computation_memory, layers[0], 1));
+
+        for i in 1..layers.len() {
+            w.push(Matrix::alloc(&nn_memory, layers[i], layers[i - 1]));
+        }
+
+        for i in 1..layers.len() {
+            b.push(Matrix::alloc(&nn_memory, layers[i], 1));
+            a.push(Matrix::alloc(&computation_memory, layers[i], 1));
+            gw.push(Matrix::alloc(&computation_memory, layers[i], layers[i - 1]));
+            gb.push(Matrix::alloc(&computation_memory, layers[i], 1));
+            ga.push(Matrix::alloc(&computation_memory, layers[i], 1));
+        }
+        
+        Ok(Self {
+            n_layers,
+            nn_memory,
+            computation_memory,
+            w,
+            b,
+            a,
+            gw,
+            gb,
+            ga,
+        })
     }
 }
 
@@ -739,5 +896,83 @@ mod test {
         assert_eq!(output[0], 1.);
         assert_eq!(output[1], 2.);
         assert_eq!(output[2], 3.);
+    }
+
+    #[test]
+    fn matrix_from_ptr() {
+        let mut v = vec![1f32, 2f32, 3f32, 4f32];
+        let matrix = Matrix::from_ptr(v.as_mut_ptr(), 2, 2);
+        assert_eq!(*matrix.get(0, 0), 1f32);
+        assert_eq!(*matrix.get(0, 1), 2f32);
+        assert_eq!(*matrix.get(1, 0), 3f32);
+        assert_eq!(*matrix.get(1, 1), 4f32);
+    }
+
+    #[test]
+    fn matrix_save_load() {
+        let mut v = vec![1f32, 2f32, 3f32, 4f32];
+        let matrix = Matrix::from_ptr(v.as_mut_ptr(), 2, 2);
+        matrix.save("test.mat").expect("Failed to save the matrix");
+        let (_memory, loaded_matrix) = Matrix::load("test.mat").expect("Failed to load matrix");
+        assert_eq!(matrix.rows, loaded_matrix.rows);
+        assert_eq!(matrix.cols, loaded_matrix.cols);
+        for i in 0..matrix.rows {
+            for j in 0..loaded_matrix.cols {
+                assert_eq!(*matrix.get(i, j), *loaded_matrix.get(i, j));
+            }
+        }
+    }
+
+    #[test]
+    fn nn_save_load() {
+        let layout = &[3, 2, 3];
+        let nn = NN::new(layout);
+        nn.save("NN.mat").expect("Failed to save the NN");
+        let nn_loaded = NN::load("NN.mat").expect("Failed to load the NN");
+        assert_eq!(nn.n_layers, nn_loaded.n_layers);
+        assert_eq!(nn.w.len(), nn_loaded.w.len());
+        for i in 0..nn.w.len() {
+            assert_eq!(nn.w[i].rows, nn_loaded.w[i].rows);
+            assert_eq!(nn.w[i].cols, nn_loaded.w[i].cols);
+            for j in 0..nn.w[i].rows {
+                for k in 0..nn.w[i].cols {
+                    assert_eq!(*nn.w[i].get(j, k), *nn_loaded.w[i].get(j, k));
+                }
+            }            
+        }
+        assert_eq!(nn.b.len(), nn_loaded.b.len());
+        for i in 0..nn.b.len() {
+            assert_eq!(nn.b[i].rows, nn_loaded.b[i].rows);
+            assert_eq!(nn.b[i].cols, nn_loaded.b[i].cols);
+            for j in 0..nn.b[i].rows {
+                for k in 0..nn.b[i].cols {
+                    assert_eq!(*nn.b[i].get(j, k), *nn_loaded.b[i].get(j, k));
+                }
+            }            
+        }
+        assert_eq!(nn.a.len(), nn_loaded.a.len());
+        for i in 0..nn.a.len() {
+            assert_eq!(nn.a[i].rows, nn_loaded.a[i].rows);
+            assert_eq!(nn.a[i].cols, nn_loaded.a[i].cols);
+            for j in 0..nn.a[i].rows {
+                for k in 0..nn.a[i].cols {
+                    assert_eq!(*nn.a[i].get(j, k), *nn_loaded.a[i].get(j, k));
+                }
+            }            
+        }
+        assert_eq!(nn.gw.len(), nn_loaded.gw.len());
+        for i in 0..nn.gw.len() {
+            assert_eq!(nn.gw[i].rows, nn_loaded.gw[i].rows);
+            assert_eq!(nn.gw[i].cols, nn_loaded.gw[i].cols);
+        }
+        assert_eq!(nn.gw.len(), nn_loaded.gw.len());
+        for i in 0..nn.gb.len() {
+            assert_eq!(nn.gb[i].rows, nn_loaded.gb[i].rows);
+            assert_eq!(nn.gb[i].cols, nn_loaded.gb[i].cols);
+        }
+        for i in 0..nn.ga.len() {
+            assert_eq!(nn.ga[i].rows, nn_loaded.ga[i].rows);
+            assert_eq!(nn.ga[i].cols, nn_loaded.ga[i].cols);
+        }
     }
 }
