@@ -1,4 +1,4 @@
-% Created 2025-05-09 Fri 16:01
+% Created 2025-05-26 Mon 17:12
 % Intended LaTeX compiler: pdflatex
 \documentclass[11pt]{article}
 \usepackage[utf8]{inputenc}
@@ -30,9 +30,9 @@
 \tableofcontents
 
 \section{Network equation}
-\label{sec:org7480b94}
+\label{sec:org2926c36}
 \subsection{Simple single neuron network}
-\label{sec:org470b58d}
+\label{sec:org4fa91bc}
 
 I'll start with a simple network where each layer has only one neuron, one input and one output.
 
@@ -98,14 +98,14 @@ The goal is to find the parameters of the network \(W_1, W_2, .. W_n\) that mini
   \frac{\partial C}{\partial W_1} = \sum_{c=1}^N 2
 \end{align}
 \section{Complete network}
-\label{sec:org49decd3}
+\label{sec:org1d9b4ad}
 \subsection{Activation function of one layer}
-\label{sec:org733aac5}
+\label{sec:orge7474c6}
 \begin{equation}
 a_{n}^{k} = \sigma(\sum_{l=1}^{N(k-1)} w_{n, l}^{k} a_{l}^{k-1} + b_{n})
 \end{equation}
 \subsection{Cost function}
-\label{sec:org39af615}
+\label{sec:org77fe2e2}
 Let:
 \begin{itemize}
 \item \(T\): the number of trials,
@@ -117,7 +117,7 @@ Let:
 C = \sum_{i=1}^{T}\sum_{n=1}^{N(K)} (a_{n}^{N(K)} - y_{n})^{2}
 \end{equation}
 \subsubsection{Layer K: Last layer}
-\label{sec:org6f4ace2}
+\label{sec:org8fe5eb8}
 let's try finding the derivatives with the weights of the last layer, \(K\) and lets denote the error of the \(n_{\text{th}}\) output with:
 
 \(\newline\)
@@ -150,7 +150,7 @@ Then:
 \frac{\partial C}{\partial w_{c,p}^{K}} = \sum_{i=1}^{T}e_{c} a_{p}
 \end{equation}
 \subsubsection{Layer K - 1}
-\label{sec:orga6a1b07}
+\label{sec:orgc0c00af}
 let's try now with the derivatives of the layer before the last, \(K-1\): 
 \begin{align}
 \frac{\partial C}{\partial w_{c,p}^{K-1}} &= \sum_{i=1}^{T}\sum_{n=1}^{N(K)} 2\epsilon_{n}\frac{\partial a_{n}^{K}}{\partial w_{c,p}^{K-1}}
@@ -196,7 +196,7 @@ so that:
 \frac{\partial C}{\partial w_{c,p}^{K-1}} = \sum_{i=1}^{T}e_c^{K-1}a_{p}^{K-2}
 \end{equation}
 \subsubsection{Layer K-2}
-\label{sec:orgeb1922f}
+\label{sec:orgdc136db}
 let's try now with the derivatives of two layers before the last, \(K-2\):
 \begin{align}
 \frac{\partial C}{\partial w_{c,p}^{K-2}} &= \sum_{i=1}^{T}\sum_{n=1}^{N(K)} 2\epsilon_{n}\frac{\partial a_{n}^{K}}{\partial w_{c,p}^{K-2}}
@@ -252,4 +252,53 @@ as the propagation of the error to the \(c\) node of the \(K-2\) layer so that:
 \begin{equation}
 \frac{\partial C}{\partial w_{c,p}^{K-2}} = e_{c}^{K-2}a_{p}^{K-3}
 \end{equation}
+\subsection{Generic activation function}
+\label{sec:orgd0c2550}
+
+\begin{align}
+&z_{i}^{k} = \sum_{j=1}^{N(k-1)} w_{i,j}^{k}a_{j}^{k-1} + b_{i}^{k}
+\\
+&a_{i}^{k} = \alpha(z_{i}^{k})
+\end{align}
+
+\begin{align}
+C &= \sum_{t=1}^{T} \sum_{i=1}^{N(K)}(a_{i} - y_{i. t})^{2}
+\\
+\frac{\partial C}{\partial w_{c, p}^{K}} &= \frac{\partial\sum_{t=1}^{T} \sum_{i=1}^{N(K)}(a_{i}^{K} - y_{i. t})^{2}}{\partial w_{c, p}^{K}}
+\\
+\frac{\partial C}{\partial w_{c, p}^{K}} &= \sum_{t=1}^{T} \frac{\partial \sum_{i=1}^{N(K)}(a_{i}^{K} - y_{i. t})^{2}}{\partial w_{c, p}^{K}}
+\\
+\frac{\partial C}{\partial w_{c, p}^{K}} &= \sum_{t=1}^{T} \sum_{i=1}^{N(K)} \frac{\partial (a_{i}^{K} - y_{i. t})^{2}}{\partial w_{c, p}^{K}}
+\\
+\frac{\partial C}{\partial w_{c, p}^{K}} &= \sum_{t=1}^{T} \sum_{i=1}^{N(K)} 2(a_{i}^{K} - y_{i. t}) \frac{d a_{i}^{K}}{d z_{i}^{K}}\frac{\partial z_{i}^{K}}{\partial w_{c, p}^{K}}
+\\
+\frac{\partial z_{i}^{K}}{\partial w_{c, p}^{K}} &= \frac{\partial \sum_{j=1}^{L(n-1)} w_{j,i}^{n}a_{j}^{n-1} + b_{i}^{n}}{\partial w_{c, p}^{K}}
+\\
+\frac{\partial z_{i}^{K}}{\partial w_{c, p}^{K}} &= \sum_{j=1}^{N(K-1)} \frac{\partial w_{i,j}^{K}a_{j}^{K-1} + b_{i}^{K}}{\partial w_{c, p}^{K}}
+\\
+\frac{\partial C}{\partial w_{c, p}^{K}} &= \sum_{t=1}^{T} \sum_{i=1}^{N(K)} 2(a_{i}^{K} - y_{i. t}) \frac{d a_{i}^{K}}{d z_{i}^{K}}\sum_{j=1}^{N(K-1)} \frac{\partial (w_{i,j}^{K}a_{j}^{K-1} + b_{i}^{K})}{\partial w_{c, p}^{K}}
+\\
+\frac{\partial C}{\partial w_{c, p}^{K}} &= \sum_{t=1}^{T} 2(a_{c}^{K} - y_{c, t}) \frac{d a_{c}^{K}}{d z_{c}^{K}}a_{p}^{K-1}
+\end{align}
+
+
+\begin{align}
+\frac{\partial C}{\partial w_{c, p}^{K-1}} &= \frac{\partial\sum_{t=1}^{T} \sum_{i=1}^{N(K)}(a_{i}^{K} - y_{i. t})^{2}}{\partial w_{c, p}^{K}}
+\\
+\frac{\partial C}{\partial w_{c, p}^{K-1}} &= \sum_{t=1}^{T} \sum_{i=1}^{N(K)} 2(a_{i}^{K} - y_{i. t}) \frac{d a_{i}^{K}}{d z_{i}^{K}}\sum_{j=1}^{N(K-1)} \frac{\partial (w_{i,j}^{K}a_{j}^{K-1} + b_{i}^{K})}{\partial w_{c, p}^{K-1}}
+\\
+\frac{\partial C}{\partial w_{c, p}^{K-1}} &= \sum_{t=1}^{T} \sum_{i=1}^{N(K)} 2(a_{i}^{K} - y_{i. t}) \frac{d a_{i}^{K}}{d z_{i}^{K}}\sum_{j=1}^{N(K-1)} \frac{\partial (w_{i,j}^{K}a_{j}^{K-1} + b_{i}^{K})}{\partial w_{c, p}^{K-1}}
+\\
+\frac{\partial C}{\partial w_{c, p}^{K-1}} &= \sum_{t=1}^{T} \sum_{i=1}^{N(K)} 2(a_{i}^{K} - y_{i. t}) \frac{d a_{i}^{K}}{d z_{i}^{K}}\sum_{j=1}^{N(K-1)} w_{i,j}^{K} \frac{\partial a_{j}^{K-1}}{\partial w_{c, p}^{K-1}}
+\\
+\frac{\partial C}{\partial w_{c, p}^{K-1}} &= \sum_{t=1}^{T} \sum_{i=1}^{N(K)} 2(a_{i}^{K} - y_{i. t}) \frac{d a_{i}^{K}}{d z_{i}^{K}}\sum_{j=1}^{N(K-1)} w_{i,j}^{K} \frac {d a_{j}^{K-1}}{d z_{j}^{K-1}} \frac{\partial z_{j}^{K-1}}{\partial w_{c, p}^{K-1}}
+\\
+\frac{\partial z_{j}^{K-1}}{\partial w_{c, p}^{K-1}} &= \frac{\partial \sum_{n=1}^{N(K-2)} w_{j,n}^{K-1}a_{n}^{K-2} + b_{j}^{K-1}}{\partial w_{c, p}^{K-1}}
+\\
+\frac{\partial z_{j}^{K-1}}{\partial w_{c, p}^{K-1}} &= \sum_{n=1}^{N(K-2)} \frac{\partial (w_{j,n}^{K-1}a_{n}^{K-2} + b_{j}^{K-1})}{\partial w_{c, p}^{K-1}}
+\\
+\frac{\partial C}{\partial w_{c, p}^{K-1}} &= \sum_{t=1}^{T} \sum_{i=1}^{N(K)} 2(a_{i}^{K} - y_{i. t}) \frac{d a_{i}^{K}}{d z_{i}^{K}}\sum_{j=1}^{N(K-1)} w_{i,j}^{K} \frac {d a_{j}^{K-1}}{d z_{j}^{K-1}}\sum_{n=1}^{N(K-2)} \frac{\partial (w_{j,n}^{K-1}a_{n}^{K-2} + b_{j}^{K-1})}{\partial w_{c, p}^{K-1}}
+\\
+\frac{\partial C}{\partial w_{c, p}^{K-1}} &= \sum_{t=1}^{T} \sum_{i=1}^{N(K)} 2(a_{i}^{K} - y_{i. t}) \frac{d a_{i}^{K}}{d z_{i}^{K}}w_{i,c}^{K} \frac {d a_{c}^{K-1}}{d z_{c}^{K-1}} a_{p}^{K-2}
+\end{align}
 \end{document}

@@ -1,4 +1,4 @@
-use nn::{Matrix, Memory, NN};
+use nn::{Matrix, Memory, NN, ReluActivation, SigmoidActivation};
 
 pub fn main() {
     #[rustfmt::skip]
@@ -17,13 +17,16 @@ pub fn main() {
     println! {"training input = {ti}"};
     println! {"training output = {to}"};
 
-    let eps = 1e-1;
+    let eps = 1e-2;
     let rate = 1e-1;
     let cycles = 1e5 as usize;
     println!("\nNetwork weights before training: {xor}");
 
+	let af = ReluActivation { relu_zero: 1e-2f32 };
+    // let af = SigmoidActivation {};
+
     for _ in 0..cycles {
-        xor.finite_diff(eps, &ti, &to);
+        xor.finite_diff(eps, &ti, &to, &af);
         // xor.back_prop(&ti, &to);
         xor.learn(rate);
     }
@@ -34,7 +37,7 @@ pub fn main() {
     for i in 0..train.cols {
         let input = train.sub_matrix(0, i, 2, 1).as_vec();
         xor.set_input(&input);
-        xor.forward();
+        xor.forward(&af);
         let y = xor.get_output();
         sum += y[0];
         println!("{input:?} = {y:?}");

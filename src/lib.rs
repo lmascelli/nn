@@ -400,6 +400,51 @@ impl std::fmt::Display for Matrix {
     }
 }
 
+pub trait ActivationFunction {
+    fn activation(&self, x: f32) -> f32;
+    fn activation_layer(&self, m: &mut Matrix);
+    fn derivative(&self, x: f32) -> f32;
+}
+
+pub struct SigmoidActivation {}
+impl ActivationFunction for SigmoidActivation {
+    fn activation(&self, x: f32) -> f32 {
+        math::sigmoid(x)
+    }
+
+    fn activation_layer(&self, m: &mut Matrix) {
+        m.sigmoid();
+    }
+
+    fn derivative(&self, x: f32) -> f32 {
+        x * (1f32 - 0.95 * x)
+    }
+}
+
+pub struct ReluActivation {
+    pub relu_zero: f32,
+}
+
+impl ActivationFunction for ReluActivation {
+    fn activation(&self, x: f32) -> f32 {
+        if x > 0f32 { x } else { x * self.relu_zero }
+    }
+
+    fn activation_layer(&self, m: &mut Matrix) {
+        for i in 0..m.rows {
+            for j in 0..m.cols {
+                if *m.get(i, j) < 0f32 {
+                    *m.get_mut(i, j) = *m.get(i, j) * self.relu_zero;
+                }
+            }
+        }
+    }
+
+    fn derivative(&self, x: f32) -> f32 {
+        if x >= 0f32 { 1f32 } else { self.relu_zero }
+    }
+}
+
 pub struct NN {
     n_layers: usize,
     nn_memory: Memory,
@@ -476,16 +521,16 @@ impl NN {
         self.a[self.n_layers].as_vec()
     }
 
-    pub fn forward(&mut self) {
+    pub fn forward(&mut self, af: &impl ActivationFunction) {
         for i in 0..self.n_layers {
             let (a_prev, a_next) = self.a.split_at_mut(i + 1);
             a_next[0].dot(&self.w[i], &a_prev[i]);
             a_next[0].add(&self.b[i]);
-            a_next[0].sigmoid();
+            af.activation_layer(&mut a_next[0]);
         }
     }
 
-    pub fn cost(&mut self, ti: &Matrix, to: &Matrix) -> f32 {
+    pub fn cost(&mut self, ti: &Matrix, to: &Matrix, af: &impl ActivationFunction) -> f32 {
         assert!(ti.cols == to.cols);
         assert!(to.rows == self.a[self.n_layers].rows);
 
@@ -493,7 +538,7 @@ impl NN {
 
         for i in 0..ti.cols {
             self.a[0].copy(&ti.col(i));
-            self.forward();
+            self.forward(af);
 
             for j in 0..to.rows {
                 let d = self.a[self.n_layers].get(j, 0) - to.get(j, i);
@@ -504,16 +549,16 @@ impl NN {
         cost / ti.cols as f32
     }
 
-    pub fn finite_diff(&mut self, eps: f32, ti: &Matrix, to: &Matrix) {
+    pub fn finite_diff(&mut self, eps: f32, ti: &Matrix, to: &Matrix, af: &impl ActivationFunction) {
         let mut saved;
-        let cost = self.cost(ti, to);
+        let cost = self.cost(ti, to, af);
 
         for i in 0..self.n_layers {
             for j in 0..self.w[i].rows {
                 for k in 0..self.w[i].cols {
                     saved = *self.w[i].get(j, k);
                     *self.w[i].get_mut(j, k) += eps;
-                    *self.gw[i].get_mut(j, k) = (self.cost(ti, to) - cost) / eps;
+                    *self.gw[i].get_mut(j, k) = (self.cost(ti, to, af) - cost) / eps;
                     *self.w[i].get_mut(j, k) = saved;
                 }
             }
@@ -521,14 +566,14 @@ impl NN {
                 for k in 0..self.b[i].cols {
                     saved = *self.b[i].get(j, k);
                     *self.b[i].get_mut(j, k) += eps;
-                    *self.gb[i].get_mut(j, k) = (self.cost(ti, to) - cost) / eps;
+                    *self.gb[i].get_mut(j, k) = (self.cost(ti, to, af) - cost) / eps;
                     *self.b[i].get_mut(j, k) = saved;
                 }
             }
         }
     }
 
-    pub fn back_prop(&mut self, ti: &Matrix, to: &Matrix) {
+    pub fn back_prop(&mut self, ti: &Matrix, to: &Matrix, af: &impl ActivationFunction) {
         debug_assert!(ti.rows == self.a[0].rows); // input is compatible with the network
         debug_assert!(to.rows == self.a[self.n_layers].rows); // output is compatible with the network
         debug_assert!(ti.cols == to.cols); // the number of trials in consistent
@@ -543,17 +588,16 @@ impl NN {
         for i in 0..ti.cols {
             // forward the network
             self.set_input(&ti.sub_matrix(0, i, ti.rows, 1).as_vec());
-            self.forward();
+            self.forward(af);
             for i in 0..self.n_layers {
                 self.ga[i].zeros();
             }
 
             // propagate the error in the output layer
             for n in 0..self.a[self.n_layers].rows {
-                let an = self.a[self.n_layers].get(n, 0);
-                let err = 2f32 * (an - *to.get(n, i)) * an; // * (1f32 - an);
+                let an = *self.a[self.n_layers].get(n, 0);
+                let err = 2f32 * (an - *to.get(n, i)) * af.derivative(an);
                 *self.ga[self.n_layers].get_mut(n, 0) = err;
-                // println!("{an} {err}");
             }
 
             let mut layer_index = self.n_layers - 1;
@@ -575,8 +619,7 @@ impl NN {
                         if layer_index != 0 {
                             *self.ga[layer_index].get_mut(cact_index, 0) += gap
                                 * *self.w[layer_index].get(nact_index, cact_index)
-                                * *self.a[layer_index].get(cact_index, 0)
-                                ; // * (1f32 - *self.a[layer_index].get(cact_index, 0));
+                                * af.derivative(*self.a[layer_index].get(cact_index, 0));
                         }
                     }
                 }
@@ -592,10 +635,7 @@ impl NN {
         for i in 0..self.n_layers {
             for j in 0..self.w[i].rows {
                 for k in 0..self.w[i].cols {
-                    // println!("{i},[{j},{k}] {}", *self.w[i].get(j, k));
-                    // println!("{}", *self.gw[i].get(j, k));
                     *self.w[i].get_mut(j, k) -= rate * *self.gw[i].get(j, k);
-                    // println!("{i},[{j},{k}] {}", *self.w[i].get(j, k));
                 }
             }
             for j in 0..self.b[i].rows {
@@ -623,7 +663,7 @@ impl NN {
         }
         Ok(())
     }
-    
+
     pub fn load<P>(filepath: P) -> Result<NN>
     where
         P: AsRef<Path>,
@@ -631,7 +671,7 @@ impl NN {
         let mut file = File::open(filepath)?;
         let mut n_layers: usize = 0;
         file.read_exact(as_mut_u8_slice(&mut n_layers))?;
-        let mut layers = vec![0usize; n_layers+1];
+        let mut layers = vec![0usize; n_layers + 1];
         file.read_exact(vec_as_mut_u8_slice(&mut layers))?;
 
         let mut nn_memory_size = 0;
@@ -666,7 +706,7 @@ impl NN {
             gb.push(Matrix::alloc(&computation_memory, layers[i], 1));
             ga.push(Matrix::alloc(&computation_memory, layers[i], 1));
         }
-        
+
         Ok(Self {
             n_layers,
             nn_memory,
@@ -938,7 +978,7 @@ mod test {
                 for k in 0..nn.w[i].cols {
                     assert_eq!(*nn.w[i].get(j, k), *nn_loaded.w[i].get(j, k));
                 }
-            }            
+            }
         }
         assert_eq!(nn.b.len(), nn_loaded.b.len());
         for i in 0..nn.b.len() {
@@ -948,7 +988,7 @@ mod test {
                 for k in 0..nn.b[i].cols {
                     assert_eq!(*nn.b[i].get(j, k), *nn_loaded.b[i].get(j, k));
                 }
-            }            
+            }
         }
         assert_eq!(nn.a.len(), nn_loaded.a.len());
         for i in 0..nn.a.len() {
@@ -958,7 +998,7 @@ mod test {
                 for k in 0..nn.a[i].cols {
                     assert_eq!(*nn.a[i].get(j, k), *nn_loaded.a[i].get(j, k));
                 }
-            }            
+            }
         }
         assert_eq!(nn.gw.len(), nn_loaded.gw.len());
         for i in 0..nn.gw.len() {

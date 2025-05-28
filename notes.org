@@ -219,3 +219,52 @@ as the propagation of the error to the $c$ node of the $K-2$ layer so that:
 \begin{equation}
 \frac{\partial C}{\partial w_{c,p}^{K-2}} = e_{c}^{K-2}a_{p}^{K-3}
 \end{equation}
+
+** Generic activation function
+
+\begin{align}
+&z_{i}^{k} = \sum_{j=1}^{N(k-1)} w_{i,j}^{k}a_{j}^{k-1} + b_{i}^{k}
+\\
+&a_{i}^{k} = \alpha(z_{i}^{k})
+\end{align}
+
+\begin{align}
+C &= \sum_{t=1}^{T} \sum_{i=1}^{N(K)}(a_{i} - y_{i. t})^{2}
+\\
+\frac{\partial C}{\partial w_{c, p}^{K}} &= \frac{\partial\sum_{t=1}^{T} \sum_{i=1}^{N(K)}(a_{i}^{K} - y_{i. t})^{2}}{\partial w_{c, p}^{K}}
+\\
+\frac{\partial C}{\partial w_{c, p}^{K}} &= \sum_{t=1}^{T} \frac{\partial \sum_{i=1}^{N(K)}(a_{i}^{K} - y_{i. t})^{2}}{\partial w_{c, p}^{K}}
+\\
+\frac{\partial C}{\partial w_{c, p}^{K}} &= \sum_{t=1}^{T} \sum_{i=1}^{N(K)} \frac{\partial (a_{i}^{K} - y_{i. t})^{2}}{\partial w_{c, p}^{K}}
+\\
+\frac{\partial C}{\partial w_{c, p}^{K}} &= \sum_{t=1}^{T} \sum_{i=1}^{N(K)} 2(a_{i}^{K} - y_{i. t}) \frac{d a_{i}^{K}}{d z_{i}^{K}}\frac{\partial z_{i}^{K}}{\partial w_{c, p}^{K}}
+\\
+\frac{\partial z_{i}^{K}}{\partial w_{c, p}^{K}} &= \frac{\partial \sum_{j=1}^{N(n-1)} w_{j,i}^{n}a_{j}^{n-1} + b_{i}^{n}}{\partial w_{c, p}^{K}}
+\\
+\frac{\partial z_{i}^{K}}{\partial w_{c, p}^{K}} &= \sum_{j=1}^{N(K-1)} \frac{\partial w_{i,j}^{K}a_{j}^{K-1} + b_{i}^{K}}{\partial w_{c, p}^{K}}
+\\
+\frac{\partial C}{\partial w_{c, p}^{K}} &= \sum_{t=1}^{T} \sum_{i=1}^{N(K)} 2(a_{i}^{K} - y_{i. t}) \frac{d a_{i}^{K}}{d z_{i}^{K}}\sum_{j=1}^{N(K-1)} \frac{\partial (w_{i,j}^{K}a_{j}^{K-1} + b_{i}^{K})}{\partial w_{c, p}^{K}}
+\\
+\frac{\partial C}{\partial w_{c, p}^{K}} &= \sum_{t=1}^{T} 2(a_{c}^{K} - y_{c, t}) \frac{d a_{c}^{K}}{d z_{c}^{K}}a_{p}^{K-1}
+\end{align}
+
+
+\begin{align}
+\frac{\partial C}{\partial w_{c, p}^{K-1}} &= \frac{\partial\sum_{t=1}^{T} \sum_{i=1}^{N(K)}(a_{i}^{K} - y_{i. t})^{2}}{\partial w_{c, p}^{K}}
+\\
+\frac{\partial C}{\partial w_{c, p}^{K-1}} &= \sum_{t=1}^{T} \sum_{i=1}^{N(K)} 2(a_{i}^{K} - y_{i. t}) \frac{d a_{i}^{K}}{d z_{i}^{K}}\sum_{j=1}^{N(K-1)} \frac{\partial (w_{i,j}^{K}a_{j}^{K-1} + b_{i}^{K})}{\partial w_{c, p}^{K-1}}
+\\
+\frac{\partial C}{\partial w_{c, p}^{K-1}} &= \sum_{t=1}^{T} \sum_{i=1}^{N(K)} 2(a_{i}^{K} - y_{i. t}) \frac{d a_{i}^{K}}{d z_{i}^{K}}\sum_{j=1}^{N(K-1)} \frac{\partial (w_{i,j}^{K}a_{j}^{K-1} + b_{i}^{K})}{\partial w_{c, p}^{K-1}}
+\\
+\frac{\partial C}{\partial w_{c, p}^{K-1}} &= \sum_{t=1}^{T} \sum_{i=1}^{N(K)} 2(a_{i}^{K} - y_{i. t}) \frac{d a_{i}^{K}}{d z_{i}^{K}}\sum_{j=1}^{N(K-1)} w_{i,j}^{K} \frac{\partial a_{j}^{K-1}}{\partial w_{c, p}^{K-1}}
+\\
+\frac{\partial C}{\partial w_{c, p}^{K-1}} &= \sum_{t=1}^{T} \sum_{i=1}^{N(K)} 2(a_{i}^{K} - y_{i. t}) \frac{d a_{i}^{K}}{d z_{i}^{K}}\sum_{j=1}^{N(K-1)} w_{i,j}^{K} \frac {d a_{j}^{K-1}}{d z_{j}^{K-1}} \frac{\partial z_{j}^{K-1}}{\partial w_{c, p}^{K-1}}
+\\
+\frac{\partial z_{j}^{K-1}}{\partial w_{c, p}^{K-1}} &= \frac{\partial \sum_{n=1}^{N(K-2)} w_{j,n}^{K-1}a_{n}^{K-2} + b_{j}^{K-1}}{\partial w_{c, p}^{K-1}}
+\\
+\frac{\partial z_{j}^{K-1}}{\partial w_{c, p}^{K-1}} &= \sum_{n=1}^{N(K-2)} \frac{\partial (w_{j,n}^{K-1}a_{n}^{K-2} + b_{j}^{K-1})}{\partial w_{c, p}^{K-1}}
+\\
+\frac{\partial C}{\partial w_{c, p}^{K-1}} &= \sum_{t=1}^{T} \sum_{i=1}^{N(K)} 2(a_{i}^{K} - y_{i. t}) \frac{d a_{i}^{K}}{d z_{i}^{K}}\sum_{j=1}^{N(K-1)} w_{i,j}^{K} \frac {d a_{j}^{K-1}}{d z_{j}^{K-1}}\sum_{n=1}^{N(K-2)} \frac{\partial (w_{j,n}^{K-1}a_{n}^{K-2} + b_{j}^{K-1})}{\partial w_{c, p}^{K-1}}
+\\
+\frac{\partial C}{\partial w_{c, p}^{K-1}} &= \sum_{t=1}^{T} \sum_{i=1}^{N(K)} 2(a_{i}^{K} - y_{i. t}) \frac{d a_{i}^{K}}{d z_{i}^{K}}w_{i,c}^{K} \frac {d a_{c}^{K-1}}{d z_{c}^{K-1}} a_{p}^{K-2}
+\end{align}

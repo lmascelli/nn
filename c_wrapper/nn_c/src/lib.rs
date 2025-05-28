@@ -2,7 +2,7 @@ use nn::{Matrix, NN};
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn matrix_from_ptr(ptr: *mut f32, rows: usize, cols: usize) -> Matrix {
-    unsafe { Matrix::from_ptr(ptr, rows, cols) }
+    Matrix::from_ptr(ptr, rows, cols)
 }
 
 #[unsafe(no_mangle)]
